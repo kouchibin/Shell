@@ -56,9 +56,12 @@ int main(void)
   while (!done) {
 
     char *line;
-    line = readline("> ");
+    
+    // register singal_handler for SIGCHLD
     signal(SIGCHLD, signal_handler);
-
+    
+    line = readline("> ");
+    
     if (!line) {
       /* Encountered EOF at top level */
       done = 1;
@@ -129,7 +132,7 @@ void signal_handler(int signo)
   if (signo == SIGCHLD) {
     int status;
     pid_t pid;
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+    while ((pid = waitpid(-1, &status, WNOHANG))) {
       printf("Process PID=%d now terminated.\n", pid);
     }
   }
