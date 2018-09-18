@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/types.h>
@@ -35,6 +36,8 @@ void PrintPgm(Pgm *);
 void stripwhite(char *);
 pid_t wait(int *wstatus);
 pid_t fork(void);
+int setpgid(pid_t pid, pid_t pgid);
+void signal_handler(int signo);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
@@ -54,6 +57,7 @@ int main(void)
 
     char *line;
     line = readline("> ");
+    signal(SIGCHLD, signal_handler);
 
     if (!line) {
       /* Encountered EOF at top level */
@@ -78,20 +82,25 @@ int main(void)
             printf("Error when forking...\n");
             exit(-1);
           } else if (pid == 0) {
+
+            if (cmd.bakground) {
+              // run command in background
+              setpgid(0, 0);
+            }
             // in child process
-            printf("arg: %s\n",cmd.pgm->pgmlist[0]);
             execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
-            // on error
+
+            // following code will be run only when exec fails
             printf("Error when executing cmd...\n");
             exit(-1);
             
           } else {
             // in parent process
             int status;
-            if (wait(&status) == -1) {
+            if (!cmd.bakground && wait(&status) == -1) {
               printf("Error when waiting for child process to complete...\n");
               exit(-1);
-            }
+            } 
           }
         } else {
           // parse cmd fail
@@ -106,6 +115,24 @@ int main(void)
     }
   }
   return 0;
+}
+
+
+/*
+ * Name: signal_handler
+ *
+ * Description: Handle the SIGCHLD signal and clean up the zombies 
+ *
+ */
+void signal_handler(int signo) 
+{
+  if (signo == SIGCHLD) {
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+      printf("Process PID=%d now terminated.\n", pid);
+    }
+  }
 }
 
 /*
@@ -123,6 +150,8 @@ PrintCommand (int n, Command *cmd)
   printf("   bg    : %s\n", cmd->bakground ? "yes" : "no");
   PrintPgm(cmd->pgm);
 }
+
+
 
 /*
  * Name: PrintPgm
