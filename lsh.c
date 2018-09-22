@@ -23,8 +23,11 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
+
 #include "parse.h"
 
 /*
@@ -38,6 +41,9 @@ pid_t wait(int *wstatus);
 pid_t fork(void);
 int setpgid(pid_t pid, pid_t pgid);
 void signal_handler(int signo);
+void executePgm(Pgm *pgm);
+void eexit(char *description);
+void setupExecEnv(Command *cmd);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
@@ -57,7 +63,7 @@ int main(void)
 
     char *line;
     
-    // register singal_handler for SIGCHLD
+    /* register singal_handler for SIGCHLD */
     signal(SIGCHLD, signal_handler);
     
     line = readline("> ");
@@ -76,42 +82,38 @@ int main(void)
 
       if(*line) {
         add_history(line);
-        /* execute it */
+
         n = parse(line, &cmd);
+        
         if (n == 1) {
-          // parse cmd successfully
+          /* Parse cmd successfully */
           pid_t pid = fork();
           if (pid < 0) {
-            printf("Error when forking...\n");
-            exit(-1);
+            eexit("Error when forking.\n");
           } else if (pid == 0) {
-
-            if (cmd.bakground) {
-              // run command in background
-              setpgid(0, 0);
-            }
-            // in child process
-            execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
-
-            // following code will be run only when exec fails
-            printf("Error when executing cmd...\n");
-            exit(-1);
-            
+            /* In child process */
+            /* Setup executing environment */
+            setupExecEnv(&cmd);
+            /* Start executing program list */
+            executePgm(cmd.pgm);
           } else {
-            // in parent process
+            /* In parent process */
             int status;
             if (!cmd.bakground && wait(&status) == -1) {
-              printf("Error when waiting for child process to complete...\n");
-              exit(-1);
+              /* Wait for child process to finish and clean up. 
+               * For background process, leave it to signal_handler.
+               */
+              eexit("Error when waiting for child process to complete.\n");
             } 
           }
         } else {
-          // parse cmd fail
-          printf("Parsing cmd failed...\n");
+          printf("Parsing cmd failed.\n");
         }
-        //PrintCommand(n, &cmd);
+        
       }
     }
+
+    
     
     if(line) {
       free(line);
@@ -120,6 +122,107 @@ int main(void)
   return 0;
 }
 
+/*
+ * Name: setupExecEnv
+ *
+ * Description: Setup Execution Environment. Including wether or not runing in 
+ * background and redirection.
+ * 
+ */
+void setupExecEnv(Command *cmd)
+{
+  if (cmd -> bakground) {
+    /* Run command in background */
+    setpgid(0, 0);
+  }
+  
+  if (cmd -> rstdin) {
+    /* Redirect stdin to file */
+    int infd;
+    if ((infd = open(cmd -> rstdin, O_RDONLY)) < 0)
+      eexit("open file error.\n");
+    if (infd != STDIN_FILENO)
+      if (dup2(infd, STDIN_FILENO) != STDIN_FILENO)
+        eexit("dup2 error.\n");
+    close(infd);
+  }
+
+  if (cmd -> rstdout) {
+    /* Redirect stdout to file */
+    int outfd;
+    if ((outfd = open(cmd -> rstdout, O_CREAT | O_WRONLY | O_TRUNC)) < 0)
+      eexit("open file error.\n");
+    if (outfd != STDOUT_FILENO)
+      if (dup2(outfd, STDOUT_FILENO) != STDOUT_FILENO)
+        eexit("dup2 error.\n");
+    close(outfd);
+  }
+}
+
+
+/*
+ * Name: executePgm
+ *
+ * Description: Execute all the commands that are in Pgm linked list. Every
+ * command is run as the child process of the previous command in the linked list.
+ *
+ */
+void executePgm(Pgm *pgm) {
+  if (pgm == NULL) return;
+  
+  if (pgm -> next) {
+    /* Has more command */
+    int pipefd[2], status;
+    pid_t pid;
+    if (pipe(pipefd) == -1) 
+      eexit("Fail to create pipe.\n");
+    pid = fork();
+    if (pid < 0) {
+      eexit("Fail to create child process when executing command.\n");
+    } else if (pid == 0) {
+      /* In child process, write end of the pipe */
+      close(pipefd[0]);
+      if (pipefd[1] != STDOUT_FILENO) {
+        if (dup2(pipefd[1], STDOUT_FILENO) != STDOUT_FILENO)
+          eexit("dup2 error.\n");
+        close(pipefd[1]);
+      }
+
+      /* Call executePgm recursively */
+      executePgm(pgm -> next);
+
+    } else {
+      /* In parent process, read end of the pipe */
+      close(pipefd[1]);
+
+      /* Bind stdin to the read end of the pipe */
+      if (pipefd[0] != STDIN_FILENO) {
+        if (dup2(pipefd[0], STDIN_FILENO) != STDIN_FILENO)
+          eexit("dup2 error.\n");
+        close(pipefd[0]);
+      }
+      
+      execvp(pgm->pgmlist[0], pgm->pgmlist);
+      perror("lsh error: ");
+    }
+  } else {
+    /* No more command */
+    execvp(pgm->pgmlist[0], pgm->pgmlist);
+    perror("lsh error");
+  }
+}
+
+/*
+ * Name: eexit
+ *
+ * Description: Print error message and exit with code -1.
+ *
+ */
+void eexit(char *description)
+{
+  perror(description);
+  exit(-1);
+}
 
 /*
  * Name: signal_handler
@@ -132,7 +235,7 @@ void signal_handler(int signo)
   if (signo == SIGCHLD) {
     int status;
     pid_t pid;
-    while ((pid = waitpid(-1, &status, WNOHANG))) {
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
       printf("Process PID=%d now terminated.\n", pid);
     }
   }
