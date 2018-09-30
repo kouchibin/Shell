@@ -8,7 +8,7 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
+Chibin Kou <chibin@student.chalmers.se>
 FirstName LastName <email@domain.example>
 
 ---- PRELIMINARIES ----
@@ -16,9 +16,25 @@ FirstName LastName <email@domain.example>
 >> If you have any preliminary comments on your submission, notes for the
 >> TAs, or extra credit, please include them here.
 
+	In our implementation, we spawn child processes in a chain manner.
+	And every parent process will wait for its child process.
+	However, when testing with the given command, we found that some 
+	behaviors are not the same as a real shell. For example, in a real
+	shell, command "grep apa | ls" will execute "ls" immediately. But 
+	in our implementation, the process of "ls" will wait for "grep" to 
+	finish. After doing some searching, we found that almost all shells
+	generate child process by forking from the main process, instead of 
+	a chain. We tried to implement it that way but didn't manage to get 
+	the code running. It was hard to debug multiprocess programs especially
+	with redirection of stdin and stdout.
+
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course instructors.
+
+	<Advanced Programming in the Unix Environment, 3rd Edition>
+	<Stackoverflow>
+	<Linux Man Page>
 
 			   COMMAND SHELL
 			   =============
