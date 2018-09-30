@@ -16,7 +16,7 @@ FirstName LastName <email@domain.example>
 >> If you have any preliminary comments on your submission, notes for the
 >> TAs, or extra credit, please include them here.
 
-	In our implementation, we spawn child processes in a chain manner.
+	In our implementation, we spawn child processes in a chained manner.
 	And every parent process will wait for its child process.
 	However, when testing with the given command, we found that some 
 	behaviors are not the same as a real shell. For example, in a real
@@ -48,6 +48,8 @@ which parts.
 >> L1: How many hours did each team member spend on this assignment?
    Make sure that each member's total time is listed.
 
+   Kou Chibin: 15-20 hours
+
 >> L2: What did each team member focus on for this assignment?  Keep
    descriptions to 25-30 words or less.
 
@@ -64,15 +66,27 @@ penalized.  We can't fix things until we know about them.  :-)
 >> In your opinion, was this assignment, or any of the parts of it, too
 >> easy or too hard?  Did it take too long or too little time?
 
+	Medium level. It takes some time but not too long.
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
+	Yes, especially the way to create child process and using pipe to 
+	communicate between them. 
 
 >> Were there any parts of the assignment that you felt were unnecessarily
 >> tedious or pointless?
 
+	Nope.
+
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
+
+	Actually, the Pgm data structure has the reverse order of the commands
+	seems to indicate that we should implement the spawning of the child 
+	process in a chained manner. Maybe we were wrong and thinking in the 
+	wrong direction. 
 
 >> Do you have any suggestions for the instructor and/or TAs to more
 >> effectively assist students, either for future quarters or the remaining
